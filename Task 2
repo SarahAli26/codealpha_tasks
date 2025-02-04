@@ -1,0 +1,99 @@
+import nltk
+import spacy
+import numpy as np
+
+# Download NLTK resources (if not already downloaded)
+try:
+    nltk.data.find('corpora/wordnet')
+except LookupError:
+    nltk.download('wordnet')
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
+# Load SpaCy
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    print("Please download spacy's 'en_core_web_sm' model. Run: python -m spacy download en_core_web_sm")
+    exit()
+
+# Sample FAQs (replace with your actual FAQs and answers)
+faqs = {
+    "What is your return policy?": "Our return policy allows for returns within 30 days of purchase.",
+    "How long does shipping take?": "Shipping typically takes 3-5 business days.",
+    "What payment methods do you accept?": "We accept Visa, Mastercard, and American Express.",
+    "Do you offer international shipping?": "Yes, we ship to most countries worldwide.",
+    "How can I track my order?": "You can track your order using the tracking number provided in your shipping confirmation email.",
+    "What if my product is damaged?": "If your product arrives damaged, please contact us immediately for a replacement.",
+    "How do I contact customer support?": "You can contact customer support by emailing support@example.com or calling us at 1-800-123-4567.",
+    "What are your store hours?": "Our store is open Monday through Friday, 9 AM to 5 PM.",
+    "Where are you located?": "We are located at 123 Main Street, Anytown, USA.",
+    "Do you have any discounts?": "We occasionally offer discounts. Check our website for current promotions.",
+    "Thank you": "I am here for your support!"
+}
+
+def preprocess(text):
+    doc = nlp(text.lower())
+    tokens = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct and not token.is_space]
+    return " ".join(tokens)
+
+def tf(term, document):
+    return document.count(term) / len(document) if document else 0
+
+def idf(term, documents):
+    n_occurrences = sum([1 for doc in documents if term in doc])
+    return np.log(len(documents) / (1 + n_occurrences)) if documents else 0
+
+def tfidf(term, document, all_documents):
+    return tf(term, document) * idf(term, all_documents)
+
+processed_faqs = [preprocess(faq) for faq in faqs.keys()]
+all_terms = set([term for faq in processed_faqs for term in faq.split()])
+
+faq_vectors = {}
+for i, faq in enumerate(processed_faqs):
+    vector = {}
+    for term in all_terms:
+        vector[term] = tfidf(term, faq.split(), processed_faqs)
+    faq_vectors[list(faqs.keys())[i]] = vector
+
+def cosine_similarity(vec1, vec2):
+    intersection = set(vec1.keys()) & set(vec2.keys())
+    numerator = sum([vec1[k] * vec2[k] for k in intersection])
+
+    sum1 = sum([vec1[k]**2 for k in vec1])
+    sum2 = sum([vec2[k]**2 for k in vec2])
+    denominator = np.sqrt(sum1) * np.sqrt(sum2)
+
+    return numerator / denominator if denominator else 0
+
+def get_response(user_input, threshold=0.2):
+    processed_input = preprocess(user_input).split()
+    user_vector = {}
+    for term in all_terms:
+        user_vector[term] = tfidf(term, processed_input, processed_faqs)
+
+    best_similarity = -1
+    best_match = None
+
+    for faq, faq_vec in faq_vectors.items():
+        similarity = cosine_similarity(user_vector, faq_vec)
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_match = faq
+
+    if best_similarity < threshold:
+        return "I'm not sure about that."
+    else:
+        return faqs[best_match]
+
+# Chatbot loop
+print("Welcome to the FAQ Chatbot!")
+while True:
+    user_input = input("You: ")
+    if user_input.lower() in ["exit", "quit", "bye"]:
+        break
+    response = get_response(user_input)
+    print("Chatbot:", response)
