@@ -1,0 +1,18 @@
+from googletrans import Translator
+
+def translate_text(text, src_lang, dest_lang):
+    translator = Translator()
+    translation = translator.translate(text, src=src_lang, dest=dest_lang)
+    return translation.text
+
+
+#translator = Translator()
+#translation = translator.translate('Hello, world!', dest='ar')  # Translate to Spanish
+
+
+text = input("Enter text to translate: ")
+src_lang = input("Enter source language (e.g., 'en' for English): ")
+dest_lang = input("Enter destination language (e.g., 'fr' for French): ")
+    
+translated_text = translate_text(text, src_lang, dest_lang)
+print(f"Translated text: {translated_text}")
